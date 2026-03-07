@@ -3,11 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import date
-from app import crud, schemas
-from app.database import Base, engine, get_db
 
-# Create tables (OK for now)
-Base.metadata.create_all(bind=engine)
+# Using relative imports to ensure Vercel's python builder maps paths correctly
+from . import crud, schemas
+from .database import Base, engine, get_db
+
+# IMPORTANT: In Serverless (Vercel), we avoid running migrations/table creation 
+# on every request. It's better to handle this via a script or migrations (Alembic).
+# If you must keep it here for now, wrap it in a startup event or a try-block.
 
 app = FastAPI(
     title="HRMS Lite API",
@@ -15,7 +18,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,9 +30,9 @@ app.add_middleware(
 # ---------- HEALTH ----------
 @app.get("/")
 def root():
-    return {"message": "HRMS Lite API running 🚀"}
+    return {"message": "HRMS Lite API running 🚀", "docs": "/docs"}
 
-@app.get("/health")
+@app.get("/api/health") # Adding /api prefix is often cleaner for Vercel routing
 def health_check():
     return {"status": "healthy"}
 
