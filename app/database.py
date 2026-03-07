@@ -12,14 +12,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # SSL is REQUIRED for Aiven MySQL
 engine = create_engine(
     DATABASE_URL,
-    connect_args={
-        "ssl": {
-            "ssl_mode": "REQUIRED"
-        }
-    },
-    pool_pre_ping=True, # Validates connections
-    pool_size=5,        # Small pool for serverless
-    max_overflow=0
+    connect_args={"ssl": {"ssl_mode": "REQUIRED"}},
+    pool_pre_ping=True,
+    pool_recycle=300
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
