@@ -4,13 +4,9 @@ from sqlalchemy.orm import Session
 from typing import List
 from datetime import date
 
-# Using relative imports to ensure Vercel's python builder maps paths correctly
+# Relative imports for Vercel path mapping
 from . import crud, schemas
 from .database import Base, engine, get_db
-
-# IMPORTANT: In Serverless (Vercel), we avoid running migrations/table creation 
-# on every request. It's better to handle this via a script or migrations (Alembic).
-# If you must keep it here for now, wrap it in a startup event or a try-block.
 
 app = FastAPI(
     title="HRMS Lite API",
@@ -18,7 +14,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS configuration
+# CORS - Essential for your frontend to communicate with the backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,16 +23,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------- HEALTH ----------
+# ---------- DATABASE INITIALIZATION ----------
+# This creates the tables in Aiven if they don't exist
+# In a professional setup, you'd use Alembic, but this works for Lite versions
+@app.on_event("startup")
+def startup():
+    Base.metadata.create_all(bind=engine)
+
+# ---------- HEALTH / ROOT ----------
 @app.get("/")
 def root():
-    return {"message": "HRMS Lite API running 🚀", "docs": "/docs"}
+    return {"message": "HRMS Lite API is live on Vercel! 🚀", "docs": "/docs"}
 
-@app.get("/api/health") # Adding /api prefix is often cleaner for Vercel routing
+@app.get("/health")
 def health_check():
     return {"status": "healthy"}
 
-# ---------- EMPLOYEE ----------
+# ---------- EMPLOYEE ENDPOINTS ----------
 @app.post("/employees/", response_model=schemas.EmployeeResponse, status_code=status.HTTP_201_CREATED)
 def create_employee(employee: schemas.EmployeeCreate, db: Session = Depends(get_db)):
     try:
@@ -63,7 +66,7 @@ def delete_employee(employee_id: str, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-# ---------- ATTENDANCE ----------
+# ---------- ATTENDANCE ENDPOINTS ----------
 @app.post("/attendance/", response_model=schemas.AttendanceResponse, status_code=status.HTTP_201_CREATED)
 def mark_attendance(attendance: schemas.AttendanceCreate, db: Session = Depends(get_db)):
     try:

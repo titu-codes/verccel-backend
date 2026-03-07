@@ -1,10 +1,8 @@
 fastapi
-uvicorn
+uvicorn[standard]
 sqlalchemy
 pymysql
 python-dotenv
-pydantic
-cors
+pydantic[email]
 python-multipart
-fastapi
-email-validator
+cryptography
