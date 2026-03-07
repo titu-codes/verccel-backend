@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+pymysql
+python-dotenv
+pydantic
+cors
+python-multipart
+fastapi
+email-validator
