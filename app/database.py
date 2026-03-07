@@ -17,8 +17,9 @@ engine = create_engine(
             "ssl_mode": "REQUIRED"
         }
     },
-    pool_pre_ping=True,  # Automatically reconnects if the connection drops
-    pool_recycle=300     # Refreshes connections every 5 minutes
+    pool_pre_ping=True, # Validates connections
+    pool_size=5,        # Small pool for serverless
+    max_overflow=0
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
