@@ -14,8 +14,11 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL") if not USE_SQLITE else None
 
 if USE_SQLITE or not DATABASE_URL:
-    # Local SQLite for development when MySQL is not configured
-    db_path = os.path.join(os.path.dirname(__file__), "..", "hrms_lite.db")
+    # Vercel serverless: filesystem is read-only except /tmp
+    if os.getenv("VERCEL"):
+        db_path = "/tmp/hrms_lite.db"
+    else:
+        db_path = os.path.join(os.path.dirname(__file__), "..", "hrms_lite.db")
     DATABASE_URL = f"sqlite:///{db_path}"
 
 if DATABASE_URL.startswith("sqlite"):
@@ -46,7 +49,7 @@ else:
     except Exception as e:
         import warnings
         warnings.warn(f"MySQL unreachable ({e}). Using SQLite for local development.")
-        db_path = os.path.join(os.path.dirname(__file__), "..", "hrms_lite.db")
+        db_path = "/tmp/hrms_lite.db" if os.getenv("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "hrms_lite.db")
         DATABASE_URL = f"sqlite:///{db_path}"
         engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
