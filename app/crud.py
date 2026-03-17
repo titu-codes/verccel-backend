@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import and_
-from app.models import Employee, Attendance, AttendanceStatus
+from app.models import Employee, Attendance
 from app.schemas import EmployeeCreate, AttendanceCreate
 from datetime import date, timedelta
 from collections import defaultdict
@@ -80,8 +80,18 @@ def get_attendance_in_date_range(db: Session, start_date: date, end_date: date):
     ).all()
 
 
-def get_analytics_dashboard(db: Session, days: int = 7):
-    today = date.today()
+def _is_present(status) -> bool:
+    """Handle status from DB (enum or string)."""
+    s = (str(status) or "").strip().lower()
+    return s == "present"
+
+def _is_absent(status) -> bool:
+    s = (str(status) or "").strip().lower()
+    return s == "absent"
+
+def get_analytics_dashboard(db: Session, days: int = 7, today: date = None):
+    if today is None:
+        today = date.today()
     start_date = today - timedelta(days=days - 1)
 
     # Total employees
@@ -89,13 +99,13 @@ def get_analytics_dashboard(db: Session, days: int = 7):
 
     # Today's attendance
     today_attendance = get_attendance_by_date(db, today)
-    today_present = sum(1 for a in today_attendance if a.status == AttendanceStatus.PRESENT)
-    today_absent = sum(1 for a in today_attendance if a.status == AttendanceStatus.ABSENT)
+    today_present = sum(1 for a in today_attendance if _is_present(a.status))
+    today_absent = sum(1 for a in today_attendance if _is_absent(a.status))
 
     # Last N days attendance
     range_attendance = get_attendance_in_date_range(db, start_date, today)
-    last7_present = sum(1 for a in range_attendance if a.status == AttendanceStatus.PRESENT)
-    last7_absent = sum(1 for a in range_attendance if a.status == AttendanceStatus.ABSENT)
+    last7_present = sum(1 for a in range_attendance if _is_present(a.status))
+    last7_absent = sum(1 for a in range_attendance if _is_absent(a.status))
 
     # Attendance by date for chart
     by_date = defaultdict(lambda: {"present": 0, "absent": 0})
@@ -105,7 +115,7 @@ def get_analytics_dashboard(db: Session, days: int = 7):
     for a in range_attendance:
         key = a.date.isoformat()
         if key in by_date:
-            if a.status == AttendanceStatus.PRESENT:
+            if _is_present(a.status):
                 by_date[key]["present"] += 1
             else:
                 by_date[key]["absent"] += 1
@@ -119,7 +129,7 @@ def get_analytics_dashboard(db: Session, days: int = 7):
     absent_by_employee = defaultdict(int)
     employee_info = {}
     for a in range_attendance:
-        if a.status == AttendanceStatus.ABSENT:
+        if _is_absent(a.status):
             absent_by_employee[a.employee_id] += 1
         emp = db.query(Employee).filter(Employee.employee_id == a.employee_id).first()
         if emp and a.employee_id not in employee_info:
