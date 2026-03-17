@@ -33,7 +33,7 @@ def startup():
 # ---------- HEALTH / ROOT ----------
 @app.get("/")
 def root():
-    return {"message": "HRMS Lite API is live on Vercel! 🚀", "docs": "/docs"}
+    return {"message": "HRMS Lite API is live on Railway! 🚀", "docs": "/docs"}
 
 @app.get("/health")
 def health_check():
