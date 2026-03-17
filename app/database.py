@@ -25,6 +25,9 @@ ON_VERCEL = bool(os.getenv("VERCEL"))
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL")
 if DATABASE_URL:
     USE_SQLITE = False  # Prefer persistent DB when available
+    # Railway uses postgres:// - SQLAlchemy needs postgresql://
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = "postgresql" + DATABASE_URL[8:]  # postgres:// -> postgresql://
 
 if ON_RAILWAY and not DATABASE_URL:
     print(
@@ -48,7 +51,7 @@ if USE_SQLITE or not DATABASE_URL:
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 elif DATABASE_URL.startswith("postgresql"):
-    # PostgreSQL (Neon, Supabase, Vercel Postgres) - persistent, works on Vercel
+    # PostgreSQL (Railway, Neon, Supabase) - persistent
     try:
         # Ensure psycopg2 driver for postgresql:// URLs
         if DATABASE_URL.startswith("postgresql://") and "+" not in DATABASE_URL.split("://")[0]:
@@ -57,10 +60,12 @@ elif DATABASE_URL.startswith("postgresql"):
             DATABASE_URL,
             pool_pre_ping=True,
             pool_recycle=300,
+            connect_args={"connect_timeout": 10},
         )
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
     except Exception as e:
+        print(f"PostgreSQL connection failed: {e}", file=sys.stderr, flush=True)
         import warnings
         warnings.warn(f"PostgreSQL unreachable ({e}). Using SQLite fallback.")
         db_path = "/tmp/hrms_lite.db" if os.getenv("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "hrms_lite.db")
