@@ -82,6 +82,31 @@ def get_employee_attendance(employee_id: str, db: Session = Depends(get_db)):
 def get_date_attendance(attendance_date: date, db: Session = Depends(get_db)):
     return crud.get_attendance_by_date(db, attendance_date)
 
+
+@app.post("/attendance/populate-last-7-days")
+def populate_last_7_days(db: Session = Depends(get_db)):
+    """Mark all employees as Present for the last 7 days (skips already marked)."""
+    from datetime import timedelta
+    today = date.today()
+    employees = crud.get_employees(db)
+    if not employees:
+        return {"message": "No employees to mark", "marked": 0}
+    marked = 0
+    for d in range(7):
+        d_date = today - timedelta(days=d)
+        for emp in employees:
+            try:
+                crud.create_attendance(db, schemas.AttendanceCreate(
+                    employee_id=emp.employee_id,
+                    date=d_date,
+                    status="Present",
+                ))
+                marked += 1
+            except ValueError:
+                pass  # Already marked
+    return {"message": f"Marked {marked} attendance record(s)", "marked": marked}
+
+
 # ---------- ANALYTICS ENDPOINTS ----------
 @app.get("/analytics/dashboard", response_model=schemas.AnalyticsDashboard)
 def get_analytics_dashboard(days: int = 7, db: Session = Depends(get_db)):
