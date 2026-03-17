@@ -21,7 +21,10 @@ ON_RAILWAY = bool(
 ON_VERCEL = bool(os.getenv("VERCEL"))
 
 # Get URL: DATABASE_URL (Railway auto-sets this), or POSTGRES_URL (Neon), or SQLite for local only
-DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") if not USE_SQLITE else None
+# When DATABASE_URL is set (e.g. Railway PostgreSQL), always use it - ignore USE_SQLITE
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL")
+if DATABASE_URL:
+    USE_SQLITE = False  # Prefer persistent DB when available
 
 if ON_RAILWAY and not DATABASE_URL:
     print(
