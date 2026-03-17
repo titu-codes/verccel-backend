@@ -81,13 +81,14 @@ def get_attendance_in_date_range(db: Session, start_date: date, end_date: date):
 
 
 def _is_present(status) -> bool:
-    """Handle status from DB (enum or string)."""
+    """Handle status from DB (enum/string - Present, PRESENT, present)."""
     s = (str(status) or "").strip().lower()
-    return s == "present"
+    return s in ("present",)
 
 def _is_absent(status) -> bool:
+    """Handle status from DB (enum/string - Absent, ABSENT, absent)."""
     s = (str(status) or "").strip().lower()
-    return s == "absent"
+    return s in ("absent",)
 
 def get_analytics_dashboard(db: Session, days: int = 7, today: date = None):
     if today is None:
@@ -107,17 +108,14 @@ def get_analytics_dashboard(db: Session, days: int = 7, today: date = None):
     last7_present = sum(1 for a in range_attendance if _is_present(a.status))
     last7_absent = sum(1 for a in range_attendance if _is_absent(a.status))
 
-    # Attendance by date for chart
+    # Attendance by date for chart - ONLY include dates that have marked attendance
     by_date = defaultdict(lambda: {"present": 0, "absent": 0})
-    for d in range(days):
-        d_date = start_date + timedelta(days=d)
-        by_date[d_date.isoformat()] = {"present": 0, "absent": 0}
     for a in range_attendance:
         key = a.date.isoformat()
-        if key in by_date:
+        if start_date <= a.date <= today:
             if _is_present(a.status):
                 by_date[key]["present"] += 1
-            else:
+            elif _is_absent(a.status):
                 by_date[key]["absent"] += 1
 
     attendance_by_date = [
