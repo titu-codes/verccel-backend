@@ -1,8 +1,10 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from app.models import Employee, Attendance
+from sqlalchemy import and_
+from app.models import Employee, Attendance, AttendanceStatus
 from app.schemas import EmployeeCreate, AttendanceCreate
-from datetime import date
+from datetime import date, timedelta
+from collections import defaultdict
 import logging
 
 logger = logging.getLogger(__name__)
@@ -69,3 +71,82 @@ def create_attendance(db: Session, attendance: AttendanceCreate):
     db.commit()
     db.refresh(db_attendance)
     return db_attendance
+
+
+# Analytics
+def get_attendance_in_date_range(db: Session, start_date: date, end_date: date):
+    return db.query(Attendance).filter(
+        and_(Attendance.date >= start_date, Attendance.date <= end_date)
+    ).all()
+
+
+def get_analytics_dashboard(db: Session, days: int = 7):
+    today = date.today()
+    start_date = today - timedelta(days=days - 1)
+
+    # Total employees
+    total_employees = db.query(Employee).count()
+
+    # Today's attendance
+    today_attendance = get_attendance_by_date(db, today)
+    today_present = sum(1 for a in today_attendance if a.status == AttendanceStatus.PRESENT)
+    today_absent = sum(1 for a in today_attendance if a.status == AttendanceStatus.ABSENT)
+
+    # Last N days attendance
+    range_attendance = get_attendance_in_date_range(db, start_date, today)
+    last7_present = sum(1 for a in range_attendance if a.status == AttendanceStatus.PRESENT)
+    last7_absent = sum(1 for a in range_attendance if a.status == AttendanceStatus.ABSENT)
+
+    # Attendance by date for chart
+    by_date = defaultdict(lambda: {"present": 0, "absent": 0})
+    for d in range(days):
+        d_date = start_date + timedelta(days=d)
+        by_date[d_date.isoformat()] = {"present": 0, "absent": 0}
+    for a in range_attendance:
+        key = a.date.isoformat()
+        if key in by_date:
+            if a.status == AttendanceStatus.PRESENT:
+                by_date[key]["present"] += 1
+            else:
+                by_date[key]["absent"] += 1
+
+    attendance_by_date = [
+        {"date": k, "present_count": v["present"], "absent_count": v["absent"]}
+        for k, v in sorted(by_date.items())
+    ]
+
+    # Most absent in last N days
+    absent_by_employee = defaultdict(int)
+    employee_info = {}
+    for a in range_attendance:
+        if a.status == AttendanceStatus.ABSENT:
+            absent_by_employee[a.employee_id] += 1
+        emp = db.query(Employee).filter(Employee.employee_id == a.employee_id).first()
+        if emp and a.employee_id not in employee_info:
+            employee_info[a.employee_id] = {"full_name": emp.full_name, "department": emp.department}
+
+    # Include all employees who had any attendance in range
+    for a in range_attendance:
+        if a.employee_id not in employee_info:
+            emp = db.query(Employee).filter(Employee.employee_id == a.employee_id).first()
+            if emp:
+                employee_info[a.employee_id] = {"full_name": emp.full_name, "department": emp.department}
+
+    most_absent = [
+        {
+            "employee_id": eid,
+            "full_name": employee_info.get(eid, {}).get("full_name", "Unknown"),
+            "department": employee_info.get(eid, {}).get("department", ""),
+            "absent_count": count,
+        }
+        for eid, count in sorted(absent_by_employee.items(), key=lambda x: -x[1])
+    ][:10]
+
+    return {
+        "total_employees": total_employees,
+        "today_present": today_present,
+        "today_absent": today_absent,
+        "last7_days": {"present_count": last7_present, "absent_count": last7_absent},
+        "most_absent_last7_days": most_absent,
+        "attendance_by_date": attendance_by_date,
+    }

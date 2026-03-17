@@ -19,3 +19,8 @@ env/
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# Debug / test files
+test_output.txt
+startup_log.txt
+test_import.py

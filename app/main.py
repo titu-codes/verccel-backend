@@ -81,3 +81,8 @@ def get_employee_attendance(employee_id: str, db: Session = Depends(get_db)):
 @app.get("/attendance/date/{attendance_date}", response_model=List[schemas.AttendanceResponse])
 def get_date_attendance(attendance_date: date, db: Session = Depends(get_db)):
     return crud.get_attendance_by_date(db, attendance_date)
+
+# ---------- ANALYTICS ENDPOINTS ----------
+@app.get("/analytics/dashboard", response_model=schemas.AnalyticsDashboard)
+def get_analytics_dashboard(days: int = 7, db: Session = Depends(get_db)):
+    return crud.get_analytics_dashboard(db, days=days)

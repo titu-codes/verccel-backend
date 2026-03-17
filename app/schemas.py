@@ -40,3 +40,31 @@ class AttendanceResponse(AttendanceBase):
 
 class EmployeeWithAttendance(EmployeeResponse):
     attendance_records: list[AttendanceResponse] = []
+
+
+# Analytics schemas
+class MostAbsentEmployee(BaseModel):
+    employee_id: str
+    full_name: str
+    department: str
+    absent_count: int
+
+
+class AttendanceByDateItem(BaseModel):
+    date: str
+    present_count: int
+    absent_count: int
+
+
+class Last7DaysSummary(BaseModel):
+    present_count: int
+    absent_count: int
+
+
+class AnalyticsDashboard(BaseModel):
+    total_employees: int
+    today_present: int
+    today_absent: int
+    last7_days: Last7DaysSummary
+    most_absent_last7_days: list[MostAbsentEmployee]
+    attendance_by_date: list[AttendanceByDateItem]
