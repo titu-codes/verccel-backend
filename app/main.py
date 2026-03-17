@@ -84,10 +84,17 @@ def get_date_attendance(attendance_date: date, db: Session = Depends(get_db)):
 
 
 @app.post("/attendance/populate-last-7-days")
-def populate_last_7_days(db: Session = Depends(get_db)):
-    """Mark all employees as Present for the last 7 days (skips already marked)."""
-    from datetime import timedelta
-    today = date.today()
+def populate_last_7_days(reference_date: str = None, db: Session = Depends(get_db)):
+    """Mark all employees as Present for the last 7 days (skips already marked).
+    reference_date: YYYY-MM-DD - use user's local date (optional)."""
+    from datetime import timedelta, datetime
+    if reference_date:
+        try:
+            today = datetime.strptime(reference_date, "%Y-%m-%d").date()
+        except ValueError:
+            today = date.today()
+    else:
+        today = date.today()
     employees = crud.get_employees(db)
     if not employees:
         return {"message": "No employees to mark", "marked": 0}
@@ -109,5 +116,13 @@ def populate_last_7_days(db: Session = Depends(get_db)):
 
 # ---------- ANALYTICS ENDPOINTS ----------
 @app.get("/analytics/dashboard", response_model=schemas.AnalyticsDashboard)
-def get_analytics_dashboard(days: int = 7, db: Session = Depends(get_db)):
-    return crud.get_analytics_dashboard(db, days=days)
+def get_analytics_dashboard(days: int = 7, reference_date: str = None, db: Session = Depends(get_db)):
+    """reference_date: YYYY-MM-DD - use user's local date (avoids timezone mismatch)."""
+    from datetime import datetime
+    today = None
+    if reference_date:
+        try:
+            today = datetime.strptime(reference_date, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    return crud.get_analytics_dashboard(db, days=days, today=today)
