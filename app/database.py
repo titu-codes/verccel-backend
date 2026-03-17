@@ -28,20 +28,14 @@ if DATABASE_URL:
 
 if ON_RAILWAY and not DATABASE_URL:
     print(
-        "\n" + "=" * 60 + "\n"
-        "ERROR: Railway requires a persistent database!\n"
-        "SQLite data is LOST on every deploy/restart.\n\n"
-        "Fix: Add PostgreSQL to your Railway project:\n"
-        "  1. Railway Dashboard -> Your Project -> + New -> Database -> PostgreSQL\n"
-        "  2. Click your backend service -> Variables -> Add Variable\n"
-        "  3. Select DATABASE_URL from the PostgreSQL service reference\n"
-        "  4. Redeploy\n\n"
-        "See RAILWAY_SETUP.md for details.\n"
-        + "=" * 60,
+        "\n" + "!" * 60 + "\n"
+        "WARNING: No DATABASE_URL set on Railway. Using SQLite (data lost on restart).\n"
+        "For persistent data: Add PostgreSQL -> Variables -> DATABASE_URL\n"
+        "See RAILWAY_SETUP.md\n"
+        + "!" * 60 + "\n",
         file=sys.stderr,
         flush=True,
     )
-    sys.exit(1)
 
 if USE_SQLITE or not DATABASE_URL:
     # Local dev only - SQLite persists in project folder
