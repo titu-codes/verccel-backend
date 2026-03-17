@@ -115,15 +115,12 @@ def populate_last_7_days(reference_date: str = None, db: Session = Depends(get_d
 
 
 # ---------- ANALYTICS ENDPOINTS ----------
-@app.get("/analytics/dashboard", response_model=schemas.AnalyticsDashboard)
-def get_analytics_dashboard(days: int = 7, reference_date: str = None, db: Session = Depends(get_db)):
-    """reference_date: YYYY-MM-DD - use user's local date (avoids timezone mismatch)."""
-    from datetime import datetime
-    if reference_date:
-        try:
-            today = datetime.strptime(reference_date, "%Y-%m-%d").date()
-        except ValueError:
-            today = date.today()
-    else:
-        today = date.today()
-    return crud.get_analytics_dashboard(db, days=days, today=today)
+@app.get("/analytics/dashboard")
+def get_analytics_dashboard(
+    days: int = 7, 
+    reference_date: str = None, # Matches what frontend sends
+    db: Session = Depends(get_db)
+):
+    # Pass reference_date as the 'today' argument to crud
+    return crud.get_analytics_dashboard(db, days=days, today=reference_date)
+    
