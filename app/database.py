@@ -10,21 +10,42 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Get URL from environment variables; fallback to SQLite for local dev
-DATABASE_URL = os.getenv("DATABASE_URL") if not USE_SQLITE else None
+# Get URL: DATABASE_URL, or POSTGRES_URL (Vercel/Neon), or SQLite fallback
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") if not USE_SQLITE else None
 
 if USE_SQLITE or not DATABASE_URL:
-    # Vercel serverless: filesystem is read-only except /tmp
+    # IMPORTANT: SQLite on Vercel does NOT persist data!
+    # /tmp is ephemeral per serverless instance - data vanishes between requests.
+    # For Vercel: set DATABASE_URL or POSTGRES_URL to a hosted DB (Neon, Supabase, etc.)
     if os.getenv("VERCEL"):
-        db_path = "/tmp/hrms_lite.db"
+        db_path = "/tmp/hrms_lite.db"  # Ephemeral - use only for testing
     else:
         db_path = os.path.join(os.path.dirname(__file__), "..", "hrms_lite.db")
     DATABASE_URL = f"sqlite:///{db_path}"
 
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+elif DATABASE_URL.startswith("postgresql"):
+    # PostgreSQL (Neon, Supabase, Vercel Postgres) - persistent, works on Vercel
+    try:
+        # Ensure psycopg2 driver for postgresql:// URLs
+        if DATABASE_URL.startswith("postgresql://") and "+" not in DATABASE_URL.split("://")[0]:
+            DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+        engine = create_engine(
+            DATABASE_URL,
+            pool_pre_ping=True,
+            pool_recycle=300,
+        )
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as e:
+        import warnings
+        warnings.warn(f"PostgreSQL unreachable ({e}). Using SQLite fallback.")
+        db_path = "/tmp/hrms_lite.db" if os.getenv("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "hrms_lite.db")
+        DATABASE_URL = f"sqlite:///{db_path}"
+        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
-    # Try MySQL; fall back to SQLite if unreachable (e.g. network/DNS/firewall)
+    # MySQL (Aiven, Railway, PlanetScale)
     try:
         if "ssl_mode=" in DATABASE_URL:
             from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
@@ -36,19 +57,17 @@ else:
             clean_url = DATABASE_URL
         import ssl
         ssl_ctx = ssl.create_default_context()
-        _engine = create_engine(
+        engine = create_engine(
             clean_url,
             connect_args={"ssl": ssl_ctx},
             pool_pre_ping=True,
-            pool_recycle=300
+            pool_recycle=300,
         )
-        # Test connection
-        with _engine.connect() as conn:
+        with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        engine = _engine
     except Exception as e:
         import warnings
-        warnings.warn(f"MySQL unreachable ({e}). Using SQLite for local development.")
+        warnings.warn(f"MySQL unreachable ({e}). Using SQLite fallback.")
         db_path = "/tmp/hrms_lite.db" if os.getenv("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "hrms_lite.db")
         DATABASE_URL = f"sqlite:///{db_path}"
         engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
