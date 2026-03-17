@@ -1,4 +1,5 @@
 import os
+import sys
 
 # Check USE_SQLITE before load_dotenv so we can force SQLite for local dev
 USE_SQLITE = os.getenv("USE_SQLITE", "").lower() in ("1", "true", "yes")
@@ -10,14 +11,38 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Get URL: DATABASE_URL, or POSTGRES_URL (Vercel/Neon), or SQLite fallback
+# Railway/Vercel: ephemeral storage - SQLite data is LOST on restart. Must use PostgreSQL.
+ON_RAILWAY = bool(
+    os.getenv("RAILWAY_SERVICE_NAME")
+    or os.getenv("RAILWAY_ENVIRONMENT_NAME")
+    or os.getenv("RAILWAY_PROJECT_ID")
+    or os.getenv("RAILWAY_PUBLIC_DOMAIN")
+)
+ON_VERCEL = bool(os.getenv("VERCEL"))
+
+# Get URL: DATABASE_URL (Railway auto-sets this), or POSTGRES_URL (Neon), or SQLite for local only
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") if not USE_SQLITE else None
 
+if ON_RAILWAY and not DATABASE_URL:
+    print(
+        "\n" + "=" * 60 + "\n"
+        "ERROR: Railway requires a persistent database!\n"
+        "SQLite data is LOST on every deploy/restart.\n\n"
+        "Fix: Add PostgreSQL to your Railway project:\n"
+        "  1. Railway Dashboard -> Your Project -> + New -> Database -> PostgreSQL\n"
+        "  2. Click your backend service -> Variables -> Add Variable\n"
+        "  3. Select DATABASE_URL from the PostgreSQL service reference\n"
+        "  4. Redeploy\n\n"
+        "See RAILWAY_SETUP.md for details.\n"
+        + "=" * 60,
+        file=sys.stderr,
+        flush=True,
+    )
+    sys.exit(1)
+
 if USE_SQLITE or not DATABASE_URL:
-    # IMPORTANT: SQLite on Vercel does NOT persist data!
-    # /tmp is ephemeral per serverless instance - data vanishes between requests.
-    # For Vercel: set DATABASE_URL or POSTGRES_URL to a hosted DB (Neon, Supabase, etc.)
-    if os.getenv("VERCEL"):
+    # Local dev only - SQLite persists in project folder
+    if ON_VERCEL:
         db_path = "/tmp/hrms_lite.db"  # Ephemeral - use only for testing
     else:
         db_path = os.path.join(os.path.dirname(__file__), "..", "hrms_lite.db")
